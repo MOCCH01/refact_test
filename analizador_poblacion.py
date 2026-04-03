@@ -1,88 +1,99 @@
 """
 Módulo para el análisis de datos de población municipal de Colombia.
 """
-
-from __future__ import annotations
-
 import pandas as pd
+import os
+
+# Contenido correcto para 'analizador_poblacion.py'
+analizador_poblacion_content = """import pandas as pd
+import os
 
 
 class AnalizadorPoblacion:
-    """
-    Encapsula la carga, limpieza y análisis de datos de población.
+    \"\"\"
+    Clase para analizar datos de población desde un archivo CSV.
 
-    Args:
-        ruta_csv (str): Ruta del archivo CSV con los datos de población.
+    Esta clase carga datos de población desde un archivo CSV, los limpia
+    y permite realizar cálculos como la población total y encontrar
+    el departamento más poblado.
+    \"\"\"
 
-    Attributes:
-        dataframe (pd.DataFrame): DataFrame con los datos limpios.
-    """
+    def __init__(self, ruta_archivo_csv: str):
+        \"\"\"
+        Inicializa la clase AnalizadorPoblacion.
 
-    def __init__(self, ruta_csv: str) -> None:
-        self.dataframe = self._cargar_datos(ruta_csv)
-        self._limpiar_datos()
+        Args:
+            ruta_archivo_csv (str): La ruta al archivo CSV que contiene
+                                     los datos de población.
+        \"\"\"
+        if not os.path.exists(ruta_archivo_csv):
+            raise FileNotFoundError(f"El archivo no se encontró en: {ruta_archivo_csv}")
 
-    def _cargar_datos(self, ruta_csv: str) -> pd.DataFrame:
-        """Carga el archivo CSV y devuelve un DataFrame."""
         try:
-            return pd.read_csv(ruta_csv)
-        except FileNotFoundError:
-            return pd.DataFrame()
+            self.dataframe = pd.read_csv(ruta_archivo_csv)
+            self._limpiar_datos()
+        except Exception as e:
+            raise ValueError(f"Error al cargar o limpiar los datos: {e}")
 
-    def _limpiar_datos(self) -> None:
-        """
-        Limpia la columna de población:
-        - Elimina separadores de miles.
-        - Convierte a tipo entero.
-        - Elimina filas con valores nulos.
-        """
-        if "Poblacion" not in self.dataframe.columns:
-            return
+    def _limpiar_datos(self):
+        \"\"\"
+        Método privado para limpiar y preprocesar los datos del DataFrame.
 
-        poblacion_limpia = pd.to_numeric(
-            self.dataframe["Poblacion"]
-            .astype(str)
-            .str.replace(".", "", regex=False),
-            errors="coerce",
-        )
+        Este método renombra columnas, convierte la columna 'Poblacion'
+        a tipo numérico manejando separadores de miles y valores nulos.
+        \"\"\"
+        # Renombrar columnas para mayor claridad y consistencia
+        self.dataframe.columns = [
+            col.strip().replace(' ', '_') for col in self.dataframe.columns
+        ]
+        self.dataframe.rename(columns={'Departamento': 'departamento', 'Poblacion': 'poblacion'},
+                               inplace=True)
 
-        self.dataframe["Poblacion"] = poblacion_limpia
-        self.dataframe.dropna(subset=["Poblacion"], inplace=True)
-        self.dataframe["Poblacion"] = \
-            self.dataframe["Poblacion"].astype(int)
+        # Convertir la columna 'poblacion' a numérico, manejando errores
+        if 'poblacion' in self.dataframe.columns:
+            # Eliminar puntos (separadores de miles) y convertir a numérico
+            self.dataframe['poblacion'] = (
+                self.dataframe['poblacion']
+                .astype(str)
+                .str.replace('.', '', regex=False)
+                .str.replace(',', '', regex=False) # En caso de coma como separador de miles
+                .replace('', '0') # Reemplazar cadenas vacías con '0' antes de convertir
+                .astype(float)
+                .fillna(0) # Rellenar NaN después de la conversión a float
+                .astype(int)
+            )
+        else:
+            self.dataframe['poblacion'] = 0
 
     def calcular_poblacion_total(self) -> int:
-        """
-        Calcula la suma total de la población.
+        \"\"\"
+        Calcula la población total de todos los departamentos.
 
         Returns:
-            int: Población total.
-        """
-        if "Poblacion" not in self.dataframe.columns:
+            int: La suma total de la población.
+        \"\"\"
+        if self.dataframe.empty or 'poblacion' not in self.dataframe.columns:
             return 0
-        return int(self.dataframe["Poblacion"].sum())
+        return self.dataframe['poblacion'].sum()
 
-    def obtener_dpto_mas_poblado(self) -> tuple[str | None, int]:
-        """
-        Obtiene el departamento con mayor población acumulada.
+    def obtener_departamento_mas_poblado(self) -> tuple[str, int]:
+        \"\"\"
+        Identifica el departamento con la mayor población.
 
         Returns:
-            tuple: (nombre_departamento, poblacion_total).
-        """
-        columnas_necesarias = {"Departamento", "Poblacion"}
+            tuple[str, int]: Una tupla que contiene el nombre del departamento
+                             y su población. Si el DataFrame está vacío o
+                             no tiene datos de población, retorna ('None', 0).
+        \"\"\"
+        if self.dataframe.empty or 'poblacion' not in self.dataframe.columns or self.dataframe['poblacion'].sum() == 0:
+            return 'None', 0
 
-        if not columnas_necesarias.issubset(self.dataframe.columns):
-            return None, 0
-
-        agrupado = (
-            self.dataframe
-            .groupby("Departamento")["Poblacion"]
-            .sum()
+        departamento_mas_poblado_fila = self.dataframe.loc[self.dataframe['poblacion'].idxmax()]
+        return (
+            departamento_mas_poblado_fila['departamento'],
+            departamento_mas_poblado_fila['poblacion']
         )
+"""
 
-        if agrupado.empty:
-            return None, 0
-
-        departamento = agrupado.idxmax()
-        poblacion = int(agrupado.max())
-        return departamento, poblacion
+with open('analizador_poblacion.py', 'w') as f:
+    f.write(analizador_poblacion_content)
